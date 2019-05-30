@@ -43,21 +43,21 @@ STATE_W = 96   # less than Atari 160x192
 STATE_H = 96
 VIDEO_W = 600
 VIDEO_H = 400
-WINDOW_W = 1000
-WINDOW_H = 800
+WINDOW_W = 1700
+WINDOW_H = 1000
 
-SCALE       = 1.5        # Track scale
-TRACK_RAD   = 900/SCALE  # Track is heavily morphed circle with this radius
-PLAYFIELD   = 2000/SCALE # Game over boundary
+SCALE       = 1.9        # Track scale
+TRACK_RAD   = 800/SCALE  # Track is heavily morphed circle with this radius
+PLAYFIELD   = 1600/SCALE # Game over boundary
 FPS         = 50         # Frames per second
-ZOOM        = 2.7        # Camera zoom
+ZOOM        = 12   # Camera zoom
 ZOOM_FOLLOW = True       # Set to False for fixed view (don't use zoom)
 
 
-TRACK_DETAIL_STEP = 21/SCALE
-TRACK_TURN_RATE = 0.31
-TRACK_WIDTH = 40/SCALE
-BORDER = 8/SCALE
+TRACK_DETAIL_STEP = 15/SCALE
+TRACK_TURN_RATE = 0.6
+TRACK_WIDTH = 79/SCALE
+BORDER = 1/SCALE
 BORDER_MIN_COUNT = 4
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
@@ -121,6 +121,7 @@ class RacingSimpleEnv(gym.Env, EzPickle):
         self.invisible_video_window = None
         self.road = None
         self.car = None
+        self.car2 = None
         self.reward = 0.0
         self.prev_reward = 0.0
         self.verbose = verbose
@@ -140,6 +141,7 @@ class RacingSimpleEnv(gym.Env, EzPickle):
             self.world.DestroyBody(t)
         self.road = []
         self.car.destroy()
+        self.car2.destroy()
 
     def _create_track(self):
         CHECKPOINTS = 12
@@ -312,6 +314,7 @@ class RacingSimpleEnv(gym.Env, EzPickle):
             if self.verbose == 1:
                 print("retry to generate track (normal if there are not many of this messages)")
         self.car = Car(self.world, *self.track[0][1:4])
+        self.car2 = Car(self.world, *self.track[0][1:4])
 
         return self.step(None)[0]
 
@@ -366,13 +369,14 @@ class RacingSimpleEnv(gym.Env, EzPickle):
         vel = self.car.hull.linearVelocity
         if np.linalg.norm(vel) > 0.5:
             angle = math.atan2(vel[0], vel[1])
-        # self.transform.set_scale(zoom, zoom)
-        # self.transform.set_translation(
-        #     WINDOW_W / 2 - (scroll_x * zoom * math.cos(angle) - scroll_y * zoom * math.sin(angle)),
-        #     WINDOW_H / 4 - (scroll_x * zoom * math.sin(angle) + scroll_y * zoom * math.cos(angle)))
+        self.transform.set_scale(1, 1)
+        self.transform.set_translation(
+            WINDOW_W / 3.1,
+            WINDOW_H / 1.8) # place track
         # self.transform.set_rotation(angle) # CAR MOVES ON THE SCREEN
 
         self.car.draw(self.viewer, mode != "state_pixels")
+        self.car2.draw(self.viewer, mode != "state_pixels")
 
         arr = None
         win = self.viewer.window
