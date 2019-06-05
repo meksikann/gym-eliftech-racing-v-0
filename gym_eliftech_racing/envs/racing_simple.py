@@ -121,7 +121,6 @@ class RacingSimpleEnv(gym.Env, EzPickle):
         self.invisible_video_window = None
         self.road = None
         self.car = None
-        self.car2 = None
         self.reward = 0.0
         self.prev_reward = 0.0
         self.verbose = verbose
@@ -141,7 +140,6 @@ class RacingSimpleEnv(gym.Env, EzPickle):
             self.world.DestroyBody(t)
         self.road = []
         self.car.destroy()
-        self.car2.destroy()
 
     def _create_track(self):
         CHECKPOINTS = 12
@@ -314,7 +312,6 @@ class RacingSimpleEnv(gym.Env, EzPickle):
             if self.verbose == 1:
                 print("retry to generate track (normal if there are not many of this messages)")
         self.car = Car(self.world, *self.track[0][1:4])
-        self.car2 = Car(self.world, *self.track[0][1:4])
 
         return self.step(None)[0]
 
@@ -376,7 +373,6 @@ class RacingSimpleEnv(gym.Env, EzPickle):
         # self.transform.set_rotation(angle) # CAR MOVES ON THE SCREEN
 
         self.car.draw(self.viewer, mode != "state_pixels")
-        self.car2.draw(self.viewer, mode != "state_pixels")
 
         arr = None
         win = self.viewer.window
