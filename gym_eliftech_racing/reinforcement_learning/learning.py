@@ -2,6 +2,7 @@ import numpy as np
 # import pyglet
 # from pyglet import gl
 import argparse
+from PIL import Image
 
 # keras -------------->>>>>>>
 from keras.models import Sequential
@@ -12,7 +13,8 @@ import keras.backend as K
 # import training env
 from gym_eliftech_racing.envs.racing_simple import RacingSimpleEnv
 
-from rl.agents.dqn import DQNAgent
+# from rl.agents.dqn import DQNAgent
+from rl.agents.cem import CEMAgent
 from rl.policy import LinearAnnealedPolicy, BoltzmannQPolicy, EpsGreedyQPolicy
 from rl.memory import SequentialMemory
 from rl.core import Processor
@@ -67,60 +69,93 @@ if __name__ == "__main__":
     else:
         raise RuntimeError('Unknown image_dim_ordering.')
 
+    # OPTION: 1  - add convolution layers
+    # model.add(Convolution2D(32, (8, 8), strides=(4, 4)))
+    # model.add(Activation('relu'))
+    # model.add(Convolution2D(64, (4, 4), strides=(2, 2)))
+    # model.add(Activation('relu'))
+    # model.add(Convolution2D(64, (3, 3), strides=(2, 2)))
+    # model.add(Activation('relu'))
+    # model.add(Flatten())
+    # model.add(Dense(512))
+    # model.add(Activation('relu'))
+    # model.add(Dense(ACTIONS_number))
+    # model.add(Activation('softmax'))
+
+    # Option 2: deep network
+    model = Sequential()
+    model.add(Flatten(input_shape=(WINDOW_LENGTH,) + INPUT_SHAPE))
+    model.add(Dense(16))
+    model.add(Activation('relu'))
+    model.add(Dense(16))
+    model.add(Activation('relu'))
+    model.add(Dense(16))
+    model.add(Activation('relu'))
+    model.add(Dense(WINDOW_LENGTH))
+    # model.add(Activation('softmax'))
+
     model.summary()
 
+    # load saved checkpoint weights
+    if arguments.weights:
+        print('Loading checkpoint weights to proceed with training.....')
+        model.load_weights(arguments.weights)
 
 
+    memory = SequentialMemory(limit=1000000, window_length=WINDOW_LENGTH)
+    state_processor = GamePreprocessor()
+
+    # policy = LinearAnnealedPolicy(
+    #     EpsGreedyQPolicy(),
+    #     attr='eps',
+    #     value_max=1.,  # eps max
+    #     value_min=0.1,  # eps min
+    #     value_test=0.05,  # eps value during testing
+    #     nb_steps=1000000  # eps steps
+    # )
+    #
+    # # init RL agent, with model, gamma and cetra
+    # dqn = DQNAgent(
+    #     model=model,
+    #     nb_actions=ACTIONS_number,
+    #
+    #     memory=memory,
+    #     processor=state_processor,
+    #     nb_steps_warmup=50000,
+    #     gamma=.99,
+    #     target_model_update=10000,
+    #     train_interval=4,
+    #     delta_clip=1.
+    # )
+    #
+    # # compile DQN agent
+    # dqn.compile(
+    #     Adam(lr=.00025),
+    #     metrics=['mae']
+    # )
+
+    cem = CEMAgent(model=model, nb_actions=ACTIONS_number, memory=memory, processor=state_processor,
+               batch_size=50, nb_steps_warmup=2000, train_interval=50, elite_frac=0.05)
+    cem.compile()
+
+    # run agents mode
+    if arguments.mode == 'train':
+        env_name = 'car_racing'
+        weights_file = 'dqn_{}_weights.h5f'.format(env_name)
+        checkpoint_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
+        logs = 'dqn_{}_log.json'.format(env_name)
+        callbacks = [ModelIntervalCheckpoint(checkpoint_filename, interval=1000)]
+        callbacks += [FileLogger(logs, interval=100)]
+
+        # fit the aqn
+        # dqn.fit(env, callbacks=callbacks, nb_steps=1750000, log_interval=10000)
+        cem.fit(env, callbacks=callbacks, nb_steps=100000, visualize=True, verbose=2)
+
+        # save weights
+        # dqn.save_weights(weights_file, overwrite=True)
+        cem.save_weights(weights_file, overwrite=True)
+
+        #  evaluate algorithm
+        # dqn.test(env, nb_episodes=10, visualize=True)
 
 
-    # from pyglet.window import key
-    #
-    # a = np.array([0.0, 0.0, 0.0])
-    #
-    #
-    # def key_press(k, mod):
-    #     global restart
-    #     if k == 0xff0d: restart = True
-    #     if k == key.LEFT:  a[0] = -1.0
-    #     if k == key.RIGHT: a[0] = +1.0
-    #     if k == key.UP:    a[1] = +1.0
-    #     if k == key.DOWN:  a[2] = +0.8  # set 1.0 for wheels to block to zero rotation
-    #
-    #
-    # def key_release(k, mod):
-    #     if k == key.LEFT and a[0] == -1.0: a[0] = 0
-    #     if k == key.RIGHT and a[0] == +1.0: a[0] = 0
-    #     if k == key.UP:    a[1] = 0
-    #     if k == key.DOWN:  a[2] = 0
-    #
-    #
-    # env = RacingSimpleEnv()
-    # env.render()
-    # env.viewer.window.on_key_press = key_press
-    # env.viewer.window.on_key_release = key_release
-    # record_video = False
-    # if record_video:
-    #     from gym.wrappers.monitor import Monitor
-    #
-    #     env = Monitor(env, '/tmp/video-test', force=True)
-    # isopen = True
-    # while isopen:
-    #     env.reset()
-    #     total_reward = 0.0
-    #     steps = 0
-    #     restart = False
-    #     while True:
-    #         s, r, done, info = env.step(a)
-    #         total_reward += r
-    #         if steps % 200 == 0 or done:
-    #             print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
-    #             print("step {} total_reward {:+0.2f}".format(steps, total_reward))
-    #             # import matplotlib.pyplot as plt
-    #             # plt.imshow(s)
-    #             # plt.savefig("test.jpeg")
-    #         steps += 1
-    #         isopen = env.render()
-    #         if done or restart or isopen == False:
-    #             break
-    #
-    # env.close()
