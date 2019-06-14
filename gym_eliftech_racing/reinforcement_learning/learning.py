@@ -1,161 +1,110 @@
-import numpy as np
-# import pyglet
-# from pyglet import gl
-import argparse
-from PIL import Image
-
-# keras -------------->>>>>>>
-from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten, Convolution2D, Permute
-from keras.optimizers import Adam
-import keras.backend as K
-
-# import training env
+# CarRacing-v0
 from gym_eliftech_racing.envs.racing_simple import RacingSimpleEnv
+import numpy as np
+import gym
+import argparse
 
-# from rl.agents.dqn import DQNAgent
-from rl.agents.cem import CEMAgent
-from rl.policy import LinearAnnealedPolicy, BoltzmannQPolicy, EpsGreedyQPolicy
+from keras.models import Sequential, Model
+from keras.layers import Dense, Activation, Flatten, Input, Concatenate
+from keras.optimizers import Adam
+
+from rl.agents import DDPGAgent
 from rl.memory import SequentialMemory
-from rl.core import Processor
+from rl.random import OrnsteinUhlenbeckProcess
 from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
 
-INPUT_SHAPE = (84, 84)
-ACTIONS_number = 3
-WINDOW_LENGTH = 4
-
-class GamePreprocessor(Processor):
-    def process_observation(self, observation):
-        img = Image.fromarray(observation)
-        img = img.resize(INPUT_SHAPE).convert('L')  # resize image and convert it to black/white
-        processed_observation = np.array(img)
-        return processed_observation.astype('uint8')  # save in memory with type
-
-    def process_state(self, batch):
-        processed_batch = batch.astype('float32') / 255
-        return processed_batch
-
-    def process_reward(self, reward):
-        return np.clip(reward, -1., 1.)  # values smaler then -1 become -1 and values bigger then 1 become 1
+# parse argiments ===================================================
+parser = argparse.ArgumentParser()
+parser.add_argument('--mode', choices=['train', 'test'], default='train')
+parser.add_argument('--env-name', type=str, default='CarRacing-v0')
+parser.add_argument('--weights', type=str, default=None)
+args = parser.parse_args()
+#  =================================================================
+ENV_NAME = args.env_name
 
 
-# run manual racing
-if __name__ == "__main__":
+# Get the environment and extract the number of actions ============
+env = RacingSimpleEnv()
+# env = gym.make(ENV_NAME)
+np.random.seed(123)
+env.seed(123)
+assert len(env.action_space.shape) == 1
+nb_actions = env.action_space.shape[0]
 
-    # get command arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', choices=['train', 'test'], default='train')
-    parser.add_argument('--weights', type=str, default=None)
-    arguments = parser.parse_args()
+# Next, we build a very simple model. ================================
+actor = Sequential()
+actor.add(Flatten(input_shape=(1,) + env.observation_space.shape))
+actor.add(Dense(16))
+actor.add(Activation('relu'))
+actor.add(Dense(16))
+actor.add(Activation('relu'))
+actor.add(Dense(16))
+actor.add(Activation('relu'))
+actor.add(Dense(nb_actions))
+actor.add(Activation('linear'))
+print(actor.summary())
 
-    env = RacingSimpleEnv()
+#  critic model ===============================================================
+action_input = Input(shape=(nb_actions,), name='action_input')
+observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
+flattened_observation = Flatten()(observation_input)
+x = Concatenate()([action_input, flattened_observation])
+x = Dense(32)(x)
+x = Activation('relu')(x)
+x = Dense(32)(x)
+x = Activation('relu')(x)
+x = Dense(32)(x)
+x = Activation('relu')(x)
+x = Dense(1)(x)
+x = Activation('linear')(x)
+critic = Model(inputs=[action_input, observation_input], outputs=x)
+print(critic.summary())
 
-    np.random.seed(234)
-    env.seed(234)
-
-
-    # build model
-    input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
-    model = Sequential()
-
-    # check image ordering if 'tensorflow' or 'theano' and add first layer
-    if K.image_dim_ordering() == 'tf':
-        # (width, height, channels)
-        model.add(Permute((2, 3, 1), input_shape=input_shape))
-    elif K.image_dim_ordering() == 'th':
-        # (channels, width, height)
-        model.add(Permute((1, 2, 3), input_shape=input_shape))
-    else:
-        raise RuntimeError('Unknown image_dim_ordering.')
-
-    # OPTION: 1  - add convolution layers
-    # model.add(Convolution2D(32, (8, 8), strides=(4, 4)))
-    # model.add(Activation('relu'))
-    # model.add(Convolution2D(64, (4, 4), strides=(2, 2)))
-    # model.add(Activation('relu'))
-    # model.add(Convolution2D(64, (3, 3), strides=(2, 2)))
-    # model.add(Activation('relu'))
-    # model.add(Flatten())
-    # model.add(Dense(512))
-    # model.add(Activation('relu'))
-    # model.add(Dense(ACTIONS_number))
-    # model.add(Activation('softmax'))
-
-    # Option 2: deep network
-    model = Sequential()
-    model.add(Flatten(input_shape=(WINDOW_LENGTH,) + INPUT_SHAPE))
-    model.add(Dense(16))
-    model.add(Activation('relu'))
-    model.add(Dense(16))
-    model.add(Activation('relu'))
-    model.add(Dense(16))
-    model.add(Activation('relu'))
-    model.add(Dense(WINDOW_LENGTH))
-    # model.add(Activation('softmax'))
-
-    model.summary()
-
-    # load saved checkpoint weights
-    if arguments.weights:
-        print('Loading checkpoint weights to proceed with training.....')
-        model.load_weights(arguments.weights)
+# Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
+# even the metrics!
+memory = SequentialMemory(limit=100000, window_length=1)
+random_process = OrnsteinUhlenbeckProcess(size=nb_actions, theta=.15, mu=0., sigma=.3)
+agent = DDPGAgent(nb_actions=nb_actions, actor=actor, critic=critic, critic_action_input=action_input,
+                  memory=memory, nb_steps_warmup_critic=100, nb_steps_warmup_actor=100,
+                  random_process=random_process, gamma=.99, target_model_update=1e-3)
+agent.compile(Adam(lr=.001, clipnorm=1.), metrics=['mae'])
 
 
-    memory = SequentialMemory(limit=1000000, window_length=WINDOW_LENGTH)
-    state_processor = GamePreprocessor()
+def main():
+    weights_filename = 'weights/ddpg_{}_weights.h5f'.format(ENV_NAME)
 
-    # policy = LinearAnnealedPolicy(
-    #     EpsGreedyQPolicy(),
-    #     attr='eps',
-    #     value_max=1.,  # eps max
-    #     value_min=0.1,  # eps min
-    #     value_test=0.05,  # eps value during testing
-    #     nb_steps=1000000  # eps steps
-    # )
-    #
-    # # init RL agent, with model, gamma and cetra
-    # dqn = DQNAgent(
-    #     model=model,
-    #     nb_actions=ACTIONS_number,
-    #
-    #     memory=memory,
-    #     processor=state_processor,
-    #     nb_steps_warmup=50000,
-    #     gamma=.99,
-    #     target_model_update=10000,
-    #     train_interval=4,
-    #     delta_clip=1.
-    # )
-    #
-    # # compile DQN agent
-    # dqn.compile(
-    #     Adam(lr=.00025),
-    #     metrics=['mae']
-    # )
+    try:
+        if args.mode == 'train':
+            # Okay, now it's time to learn something! We visualize the training here for show, but this
+            # slows down training quite a lot. You can always safely abort the training prematurely using
+            # Ctrl + C.
 
-    cem = CEMAgent(model=model, nb_actions=ACTIONS_number, memory=memory, processor=state_processor,
-               batch_size=50, nb_steps_warmup=2000, train_interval=50, elite_frac=0.05)
-    cem.compile()
+            # load existing weights =============================================
+            if args.weights:
+                print('START WEIGHTS LOADED =============>>>>>>>>>>>>>')
+                start_weights_filename = 'weights/' + args.weights
+                agent.load_weights(start_weights_filename)
+            #  ==================================================================
 
-    # run agents mode
-    if arguments.mode == 'train':
-        env_name = 'car_racing'
-        weights_file = 'dqn_{}_weights.h5f'.format(env_name)
-        checkpoint_filename = 'dqn_' + env_name + '_weights_{step}.h5f'
-        logs = 'dqn_{}_log.json'.format(env_name)
-        callbacks = [ModelIntervalCheckpoint(checkpoint_filename, interval=1000)]
-        callbacks += [FileLogger(logs, interval=100)]
+            checkpoint_weights_filename = 'checkpoint/ddpg_' + ENV_NAME + '_weights_{step}.h5f'
+            log_filename = 'logs/ddpg_{}_log.json'.format(ENV_NAME)
+            callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=2500)]
+            callbacks += [FileLogger(log_filename, interval=100)]
+            agent.fit(env, callbacks=callbacks, nb_steps=50000, log_interval=1000, visualize=True)
 
-        # fit the aqn
-        # dqn.fit(env, callbacks=callbacks, nb_steps=1750000, log_interval=10000)
-        cem.fit(env, callbacks=callbacks, nb_steps=100000, visualize=True, verbose=2)
+        elif args.mode == 'test':
+            if args.weights:
+                weights_filename = 'weights/' + args.weights
 
-        # save weights
-        # dqn.save_weights(weights_file, overwrite=True)
-        cem.save_weights(weights_file, overwrite=True)
+            agent.load_weights(weights_filename)
+            agent.test(env, nb_episodes=5, visualize=True, nb_max_episode_steps=200)
 
-        #  evaluate algorithm
-        # dqn.test(env, nb_episodes=10, visualize=True)
+    finally:
+        print('save model')
+        agent.save_weights(weights_filename, overwrite=True)
 
 
+if __name__ == '__main__':
+    print('start file execution ...')
+    main()
