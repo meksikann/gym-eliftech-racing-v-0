@@ -8,4 +8,5 @@ GYM environment for reinforcement learning (vehicle racing /posible medical topi
 
 #### run train
 ```
-python gym_eliftech_racing/reinforcement_learning/learning.py --weights "ddpg_CarRacing-v0_weights.h5f"```
+python gym_eliftech_racing/reinforcement_learning/learning.py --weights "discrete_CarRacing-v0_weights.h5f"```
+
