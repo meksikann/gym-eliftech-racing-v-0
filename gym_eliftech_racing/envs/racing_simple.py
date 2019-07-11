@@ -323,14 +323,14 @@ class RacingSimpleEnv(gym.Env, EzPickle):
                 self.car.gas(action[1])
                 self.car.brake(action[2])
             else:
-                print('action number:', action)
-                if action == 1:   # turn left
+                print('action number is:', action)
+                if action == 0:   # turn left
                     self.car.steer(-1)
-                elif action == 2:  # turn right
+                elif action == 1:  # turn right
                     self.car.steer(1)
-                elif action == 3:  # gassss
+                elif action == 2:  # gassss
                     self.car.gas(0.5)
-                elif action == 4:  # break
+                elif action == 3:  # break
                     self.car.brake(0.8)
 
         self.car.step(1.0 / FPS)

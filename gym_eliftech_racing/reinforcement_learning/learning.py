@@ -1,5 +1,8 @@
-# CarRacing-v0
 from __future__ import division
+import sys
+import os
+sys.path.insert(0, os.getcwd())
+
 import argparse
 
 from PIL import Image
@@ -50,7 +53,11 @@ args = parser.parse_args()
 
 # Get the environment and extract the number of actions.
 # env = gym.make(args.env_name)
+from gym import wrappers
+
 env = RacingSimpleEnv()
+env = wrappers.Monitor(env, "/tmp/CarRacing-v0")
+
 np.random.seed(123)
 env.seed(123)
 
@@ -132,7 +139,7 @@ try:
         if args.weights:
             weights_filename = args.weights
         dqn.load_weights(weights_filename)
-        dqn.test(env, nb_episodes=10, visualize=True)
+        dqn.test(env, nb_episodes=10, visualize=False)
 finally:
     print('save model')
     dqn.save_weights(weights_filename, overwrite=True)
