@@ -3,3 +3,8 @@
 *.idea
 *.json
 *.cpython-35.pyc
+*.jpeg
+/dataset.npy
+/gym_eliftech_racing/__pycache__/__init__.cpython-35.pyc
+/gym_eliftech_racing/envs/__pycache__/__init__.cpython-35.pyc
+/gym_eliftech_racing/envs/__pycache__/racing_simple.cpython-35.pyc

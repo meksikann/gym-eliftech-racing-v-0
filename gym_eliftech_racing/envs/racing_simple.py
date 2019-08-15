@@ -39,25 +39,24 @@ from pyglet import gl
 #
 # Created by Oleg Klimov. Licensed on the same terms as the rest of OpenAI Gym.
 
-STATE_W = 96   # less than Atari 160x192
+STATE_W = 96  # less than Atari 160x192
 STATE_H = 96
 VIDEO_W = 600
 VIDEO_H = 400
 WINDOW_W = 1700
 WINDOW_H = 1000
 
-SCALE       = 1.9        # Track scale
-TRACK_RAD   = 800/SCALE  # Track is heavily morphed circle with this radius
-PLAYFIELD   = 1600/SCALE # Game over boundary
-FPS         = 50         # Frames per second
-ZOOM        = 12   # Camera zoom
-ZOOM_FOLLOW = True       # Set to False for fixed view (don't use zoom)
+SCALE = 1.9  # Track scale
+TRACK_RAD = 800 / SCALE  # Track is heavily morphed circle with this radius
+PLAYFIELD = 1600 / SCALE  # Game over boundary
+FPS = 50  # Frames per second
+ZOOM = 12  # Camera zoom
+ZOOM_FOLLOW = True  # Set to False for fixed view (don't use zoom)
 
-
-TRACK_DETAIL_STEP = 15/SCALE
+TRACK_DETAIL_STEP = 15 / SCALE
 TRACK_TURN_RATE = 0.6
-TRACK_WIDTH = 79/SCALE
-BORDER = 1/SCALE
+TRACK_WIDTH = 79 / SCALE
+BORDER = 1 / SCALE
 BORDER_MIN_COUNT = 4
 
 ROAD_COLOR = [0.4, 0.4, 0.4]
@@ -317,7 +316,7 @@ class RacingSimpleEnv(gym.Env, EzPickle):
 
     def step(self, action):
         if action is not None:
-            print('action array:', action)
+
             self.car.steer(-action[0])
             self.car.gas(action[1])
             self.car.brake(action[2])
@@ -343,8 +342,6 @@ class RacingSimpleEnv(gym.Env, EzPickle):
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 done = True
                 step_reward = -100
-
-        print(self.state)
 
         return self.state, step_reward, done, {}
 
@@ -372,7 +369,7 @@ class RacingSimpleEnv(gym.Env, EzPickle):
         self.transform.set_scale(1, 1)
         self.transform.set_translation(
             WINDOW_W / 3.1,
-            WINDOW_H / 1.8) # place track
+            WINDOW_H / 1.8)  # place track
         # self.transform.set_rotation(angle) # CAR MOVES ON THE SCREEN
 
         self.car.draw(self.viewer, mode != "state_pixels")
@@ -483,6 +480,8 @@ class RacingSimpleEnv(gym.Env, EzPickle):
 if __name__ == "__main__":
     from pyglet.window import key
 
+    dataset_url = '../car_racing_dataset/dataset.npy'
+
     a = np.array([0.0, 0.0, 0.0])
 
 
@@ -523,12 +522,26 @@ if __name__ == "__main__":
             if steps % 200 == 0 or done:
                 print("\naction " + str(["{:+0.2f}".format(x) for x in a]))
                 print("step {} total_reward {:+0.2f}".format(steps, total_reward))
-                # import matplotlib.pyplot as plt
-                # plt.imshow(s)
-                # plt.savefig("test.jpeg")
+                print('s shape:', s.shape)
+                # TODO: add state to dnp array
+                # a = np.zeros(shape=(2, 4, 4, 2) )
+                # b = np.ones(shape=(1,4,4,2))
+                #
+                # print('shape:209, 64, 64, 3', a.shape)
+                #
+                #
+                # print 'Append elements along axis 0:'
+                # d = np.append(a, b,axis = 0)
+                import matplotlib.pyplot as plt
+                plt.imshow(s)
+                plt.savefig("test.jpeg")
             steps += 1
             isopen = env.render()
             if done or restart or isopen == False:
+                np.save(dataset_url, s)
+
+                print('DONE saved dataset to {}'.format(dataset_url))
+
                 break
 
     env.close()
