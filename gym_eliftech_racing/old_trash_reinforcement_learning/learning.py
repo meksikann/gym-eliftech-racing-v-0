@@ -1,5 +1,8 @@
-# CarRacing-v0
 from __future__ import division
+import sys
+import os
+sys.path.insert(0, os.getcwd())
+
 import argparse
 
 from PIL import Image
@@ -50,7 +53,11 @@ args = parser.parse_args()
 
 # Get the environment and extract the number of actions.
 # env = gym.make(args.env_name)
+from gym import wrappers
+
 env = RacingSimpleEnv()
+env = wrappers.Monitor(env, "/tmp/CarRacing-v0")
+
 np.random.seed(123)
 env.seed(123)
 
@@ -109,11 +116,18 @@ log_filename = 'discrete_{}_log.json'.format(args.env_name)
 
 try:
     if args.mode == 'train':
+         # load existing weights =============================================
+        if args.weights:
+            print('START WEIGHTS LOADED =============>>>>>>>>>>>>>')
+            start_weights_filename = 'weights/' + args.weights
+            dqn.load_weights(start_weights_filename)
+        #  ==================================================================
+
         # Okay, now it's time to learn something! We capture the interrupt exception so that training
         # can be prematurely aborted. Notice that now you can use the built-in Keras callbacks!
-        callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
+        # callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
         # callbacks += [FileLogger(log_filename, interval=100)]
-        dqn.fit(env, callbacks=callbacks, nb_steps=1750000, visualize=True)
+        dqn.fit(env,  nb_steps=1750000, visualize=True)
 
         # After training is done, we save the final weights one more time.
         dqn.save_weights(weights_filename, overwrite=True)
@@ -125,7 +139,7 @@ try:
         if args.weights:
             weights_filename = args.weights
         dqn.load_weights(weights_filename)
-        dqn.test(env, nb_episodes=10, visualize=True)
+        dqn.test(env, nb_episodes=10, visualize=False)
 finally:
     print('save model')
     dqn.save_weights(weights_filename, overwrite=True)
