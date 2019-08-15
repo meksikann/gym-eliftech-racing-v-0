@@ -317,21 +317,10 @@ class RacingSimpleEnv(gym.Env, EzPickle):
 
     def step(self, action):
         if action is not None:
-            if type(action) == list:
-                print('action array:', action)
-                self.car.steer(-action[0])
-                self.car.gas(action[1])
-                self.car.brake(action[2])
-            else:
-                print('action number is:', action)
-                if action == 0:   # turn left
-                    self.car.steer(-1)
-                elif action == 1:  # turn right
-                    self.car.steer(1)
-                elif action == 2:  # gassss
-                    self.car.gas(0.5)
-                elif action == 3:  # break
-                    self.car.brake(0.8)
+            print('action array:', action)
+            self.car.steer(-action[0])
+            self.car.gas(action[1])
+            self.car.brake(action[2])
 
         self.car.step(1.0 / FPS)
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
@@ -354,6 +343,8 @@ class RacingSimpleEnv(gym.Env, EzPickle):
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 done = True
                 step_reward = -100
+
+        print(self.state)
 
         return self.state, step_reward, done, {}
 
